@@ -28,24 +28,24 @@ let ownedDucks = ['rubberDuck'];
 
 function preload() {
     // Get ready for some serious assets loading
-    this.load.image('duck', 'duck.png');
-    this.load.image('rubberDuck', 'rubber_duck.png');
-    this.load.image('sharpduckySprite', 'sharpducky.png');
-    this.load.image('quacksilverSprite', 'quacksilver.png');
-    this.load.audio('squeak', 'squeak.mp3');
-    this.load.audio('quack', 'quack.mp3');
-    this.load.audio('backgroundTrack1', 'Background.mp3');
-    this.load.image('orangeDuck', 'orange_duck.png');
+    this.load.image('duck', 'Sandwich/duck.png');
+    this.load.image('rubberDuck', 'Sandwich/rubber_duck.png');
+    this.load.image('sharpduckySprite', 'Sandwich/sharpducky.png');
+    this.load.image('quacksilverSprite', 'Sandwich/quacksilver.png');
+    this.load.audio('squeak', 'Sandwich/squeak.mp3');
+    this.load.audio('quack', 'Sandwich/quack.mp3');
+    this.load.audio('backgroundTrack1', 'Sandwich/Background.mp3');
+    this.load.image('orangeDuck', 'Sandwich/orange_duck.png');
 
     // The real game starts here—those feathers aren't going to spawn themselves
-    this.load.image('feathernorth', 'feathernorth.png');
-    this.load.image('feathernortheast', 'feathernortheast.png');
-    this.load.image('feathereast', 'feathereast.png');
-    this.load.image('feathersoutheast', 'feathersoutheast.png');
-    this.load.image('feathersouth', 'feathersouth.png');
-    this.load.image('feathersouthwest', 'feathersouthwest.png');    
-    this.load.image('featherwest', 'featherwest.png');
-    this.load.image('feathernorthwest', 'feathernorthwest.png');
+    this.load.image('feathernorth', 'Sandwich/feathernorth.png');
+    this.load.image('feathernortheast', 'Sandwich/feathernortheast.png');
+    this.load.image('feathereast', 'Sandwich/feathereast.png');
+    this.load.image('feathersoutheast', 'Sandwich/feathersoutheast.png');
+    this.load.image('feathersouth', 'Sandwich/feathersouth.png');
+    this.load.image('feathersouthwest', 'Sandwich/feathersouthwest.png');    
+    this.load.image('featherwest', 'Sandwich/featherwest.png');
+    this.load.image('feathernorthwest', 'Sandwich/feathernorthwest.png');
 }
 
 function create() {
