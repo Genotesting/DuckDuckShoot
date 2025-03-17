@@ -1,0 +1,70 @@
+Objective
+
+Your goal is to shoot rubber ducks and increase your "Duckability Counter" while unlocking new types of ducks and managing your arsenal.
+
+Controls
+
+Left Click: Throw a duck toward the target.
+
+G Key: Toggle the shop.
+
+F Key: Toggle the arsenal.
+
+Y Key: Confirm purchase in the shop.
+
+N Key: Cancel purchase in the shop.
+
+Gameplay Mechanics
+
+Shooting Ducks
+
+Click anywhere on the screen to throw a duck toward that location.
+
+Different ducks have different speeds and abilities:
+
+Rubber Duck: Basic projectile.
+
+Sharpducky: Faster and can pierce through two ducks.
+
+Quacksilver: Slower but can hit multiple ducks within a radius.
+
+Duckability Counter
+
+Increases each time you successfully hit a duck.
+
+Use your Duckability Points to purchase new ducks from the shop.
+
+The Shop
+
+Access the shop by pressing G.
+
+Available ducks and prices:
+
+Sharpducky: 100 points.
+
+Quacksilver: 200 points.
+
+Confirm purchase with Y or cancel with N.
+
+The Arsenal
+
+Access your arsenal with F.
+
+Select your active duck type from the ducks you own.
+
+Special Events
+
+After spawning 5000 ducks, you unlock the Orange Skin, giving you 0.1% more orange power.
+
+Occasionally, hitting a duck will spawn a horde of two additional ducks.
+
+Tips
+
+Use Sharpducky to pierce multiple ducks.
+
+Use Quacksilver for area damage when ducks cluster together.
+
+Manage your Duckability Points wisely to unlock stronger ducks.
+
+Good luck and happy duck hunting!
+
