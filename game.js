@@ -1,3 +1,4 @@
+// INSPIRED BY BRYANT ODEN - DUCK SONG
 const config = {
     type: Phaser.AUTO,
     width: 1520,
@@ -18,13 +19,30 @@ const game = new Phaser.Game(config);
 let throwCooldown = false;
 let duckabilityCounter = 0;
 let totalDucksSpawned = 0;
+let grapesPurchasedCount = 0; 
 let shopOpen = false;
 let arsenalOpen = false;
 const duckPrices = {
-    'sharpducky': 100,
-    'quacksilver': 200
+    'sharpducky': 1000,
+    'quacksilver': 3000,
+    'grapes' : 750
 };
 let ownedDucks = ['rubberDuck'];
+
+let grapesPurchased = false; // Track if grapes are purchased
+
+function applyGrapesEffect() {
+    if (!grapesPurchased) {
+        grapesPurchased = true;
+        console.log("Grapes effect applied: +5% throwing speed");
+    }
+}
+
+function getGrapesPrice() {
+    let basePrice = 750;
+    return Math.round(basePrice * Math.pow(1.5, grapesPurchasedCount));
+}
+
 
 function preload() {
     // Get ready for some serious assets loading
@@ -35,9 +53,9 @@ function preload() {
     this.load.audio('squeak', 'Sandwich/squeak.mp3');
     this.load.audio('quack', 'Sandwich/quack.mp3');
     this.load.audio('backgroundTrack1', 'Sandwich/Background.mp3');
-    this.load.image('orangeDuck', 'Sandwich/orange_duck.png');
+    this.load.image('orangeDuck', 'Sandwich/orangeduck.png');
 
-    // The real game starts here—those feathers aren't going to spawn themselves
+    // The real game starts here, those feathers aren't going to spawn themselves
     this.load.image('feathernorth', 'Sandwich/feathernorth.png');
     this.load.image('feathernortheast', 'Sandwich/feathernortheast.png');
     this.load.image('feathereast', 'Sandwich/feathereast.png');
@@ -46,10 +64,34 @@ function preload() {
     this.load.image('feathersouthwest', 'Sandwich/feathersouthwest.png');    
     this.load.image('featherwest', 'Sandwich/featherwest.png');
     this.load.image('feathernorthwest', 'Sandwich/feathernorthwest.png');
+
+    this.load.image('grapesSprite', 'Sandwich/grape.png');
+
+}
+
+function playEndingMessage() {
+    let unlockText = this.add.text(150, 250, "Congrats! This is the end of the content for now. You can continue; the game doesn't end, but this is where the content stops.", {
+        fontSize: '16px', fill: '#ffa500' 
+    });
+
+    this.tweens.add({
+        targets: unlockText,
+        alpha: { from: 1, to: 0 },
+        duration: 5000,
+        onComplete: () => {
+            unlockText.destroy();
+        }
+    });
+}
+
+function playNextTrack() {
+    this.backgroundTrack.play({
+        loop: true
+    });
 }
 
 function create() {
-    // This duck is here to kick some serious tail—treat it with respect
+    // This duck is here to kick some serious tail, treat it with respect
     this.duck = this.physics.add.sprite(760, 356, 'duck');
     this.duck.setCollideWorldBounds(true);
 
@@ -69,11 +111,13 @@ function create() {
 
     this.tracker = this.add.image(760, 600, 'rubberDuck');
     this.tracker.setOrigin(0.5, 0.5);
+    this.physics.world.enable(this.tracker);
+    this.tracker.body.setCollideWorldBounds(true); // Set borders for the tracker
 
     // Let’s give this background some serious color, yeah?
     this.cameras.main.setBackgroundColor(0x87CEEB);
 
-    // Listen for player clicks, because you're about to unleash chaos
+    // I Listen for player clicks
     this.input.on('pointerdown', (pointer) => {
         if (!throwCooldown && !shopOpen && !arsenalOpen) {
             throwCooldown = true;
@@ -97,35 +141,48 @@ function create() {
         toggleArsenal.call(this);
     });
 
+    this.input.keyboard.on('keydown-P', () => {
+        playEndingMessage.call(this);
+    });
+
     this.backgroundTrack = this.sound.add('backgroundTrack1');
 
     playNextTrack.call(this);
-}
 
-function playNextTrack() {
-    let track = this.backgroundTrack;
-
-    track.play({ loop: true });
+    // Initialize cursor keys and custom keys
+    this.cursors = this.input.keyboard.createCursorKeys(); // Arrow keys
+    this.keys = this.input.keyboard.addKeys({
+        A: Phaser.Input.Keyboard.KeyCodes.A,
+        D: Phaser.Input.Keyboard.KeyCodes.D
+    });
 }
 
 function createShop() {
-    // This shop's got everything you need to go full-on weaponized
+    // This shop's got everything you need and then it doesn't
     this.shopBg = this.add.rectangle(1200, 356, 450, 712, 0x000000, 0.5).setDepth(10);
     this.shopBg.setOrigin(0.5, 0.5);
 
     this.shopTitle = this.add.text(1050, 50, 'Shop', { fontSize: '48px', fill: '#ffffff' }).setDepth(11);
 
-    this.sharpduckyButton = this.add.text(1050, 150, 'Sharpducky - 100', { fontSize: '32px', fill: '#ffffff' }).setDepth(11);
+    this.sharpduckyButton = this.add.text(1050, 150, 'Sharpducky - 1000', { fontSize: '32px', fill: '#ffffff' }).setDepth(11);
     this.sharpduckyButton.setInteractive();
     this.sharpduckyButton.on('pointerdown', () => {
         confirmPurchase.call(this, 'sharpducky');
     });
 
-    this.quacksilverButton = this.add.text(1050, 250, 'Quacksilver - 200', { fontSize: '32px', fill: '#ffffff' }).setDepth(11);
+    this.quacksilverButton = this.add.text(1050, 250, 'Quacksilver - 3000', { fontSize: '32px', fill: '#ffffff' }).setDepth(11);
     this.quacksilverButton.setInteractive();
     this.quacksilverButton.on('pointerdown', () => {
         confirmPurchase.call(this, 'quacksilver');
     });
+
+    this.grapesButton = this.add.text(1050, 350, `Up-grapes - 750`, { fontSize: '32px', fill: '#ffffff' }).setDepth(11);
+    this.grapesButton.setInteractive();
+    this.grapesButton.on('pointerdown', () => {
+        confirmPurchase.call(this, 'grapes');
+    });
+
+    this.grapesPreview = this.add.image(1020, 365, 'grapesSprite').setDepth(11).setScale(0.5);
 
     this.sharpduckyPreview = this.add.image(1020, 165, 'sharpduckySprite').setDepth(11).setScale(0.5);
     this.quacksilverPreview = this.add.image(1020, 265, 'quacksilverSprite').setDepth(11).setScale(0.5);
@@ -134,8 +191,10 @@ function createShop() {
     this.shopTitle.setVisible(false);
     this.sharpduckyButton.setVisible(false);
     this.quacksilverButton.setVisible(false);
+    this.grapesButton.setVisible(false);
     this.sharpduckyPreview.setVisible(false);
     this.quacksilverPreview.setVisible(false);
+    this.grapesPreview.setVisible(false);
 }
 
 function toggleShop() {
@@ -145,19 +204,30 @@ function toggleShop() {
     this.shopTitle.setVisible(shopOpen);
     this.sharpduckyButton.setVisible(shopOpen);
     this.quacksilverButton.setVisible(shopOpen);
+    this.grapesButton.setVisible(shopOpen);
     this.sharpduckyPreview.setVisible(shopOpen);
     this.quacksilverPreview.setVisible(shopOpen);
+    this.grapesPreview.setVisible(shopOpen);
 
     this.sharpduckyButton.setInteractive(shopOpen);
     this.quacksilverButton.setInteractive(shopOpen);
+    this.grapesButton.setInteractive(shopOpen);
+
+    if (shopOpen) {
+        this.grapesButton.setText(`Up-grapes - ${getGrapesPrice()}`);
+    }
 }
 
 function confirmPurchase(type) {
-    if (duckabilityCounter >= duckPrices[type]) {
+    let price = (type === 'grapes') ? getGrapesPrice() : duckPrices[type]; // Get current grapes price
+
+    console.log(`Attempting to purchase ${type} for ${price}. Current duckabilityCounter: ${duckabilityCounter}`);
+
+    if (duckabilityCounter >= price && (type !== 'grapes' || grapesPurchasedCount < 5)) {
         let confirmBg = this.add.rectangle(400, 300, 500, 100, 0x000000, 0.5).setDepth(11);
         confirmBg.setOrigin(0.5, 0.5);
 
-        let confirmText = this.add.text(400, 300, `Buy ${type} for ${duckPrices[type]}? (Y/N)`, {
+        let confirmText = this.add.text(400, 300, `Buy ${type} for ${price}? (Y/N)`, {
             fontSize: '24px', fill: '#ffffff'
         }).setDepth(12).setOrigin(0.5, 0.5);
 
@@ -166,19 +236,33 @@ function confirmPurchase(type) {
         this.input.keyboard.removeAllListeners('keydown-Y');
         this.input.keyboard.removeAllListeners('keydown-N');
 
-        this.input.keyboard.once('keydown-Y', () => {
-            console.log(`You've bought ${type}, prepare for some epicness!`);
-            selectDuck.call(this, type);
-            confirmText.destroy();
-            confirmBg.destroy();
-            updateShop.call(this);
-        });
+        if (duckabilityCounter >= price && (type !== 'grapes' || grapesPurchasedCount < 5)) {
+            // Handle purchase confirmation
+            this.input.keyboard.once('keydown-Y', () => {
+                console.log(`You've bought ${type}, prepare for some epicness!`);
+                if (type === 'grapes') {
+                    applyGrapesEffect.call(this); // Apply the grapes effect
+                    grapesPurchasedCount++; // Increase grapes purchased count
+                    this.grapesButton.setText(`Up-grapes - ${getGrapesPrice()}`); // Update the grapes button text
+                } else {
+                    duckabilityCounter -= price; // Deduct the price only if it's not grapes
+                }
+                selectDuck.call(this, type);
+                console.log(`Purchased ${type} for ${price}. New duckabilityCounter: ${duckabilityCounter}`);
+                this.scoreText.setText('Duckability Counter: ' + duckabilityCounter);
+                updateShop.call(this);
+                confirmText.destroy();
+                confirmBg.destroy();
+            });
+        }        
 
         this.input.keyboard.once('keydown-N', () => {
             console.log(`You backed out of buying ${type}? Better luck next time!`);
             confirmText.destroy();
             confirmBg.destroy();
         });
+    } else {
+        console.log(`Not enough duckability to purchase ${type}. Required: ${price}, Available: ${duckabilityCounter}`);
     }
 }
 
@@ -232,6 +316,11 @@ function toggleArsenal() {
 
 function shootRubberDuck(targetX, targetY) {
     let speed = 500;
+
+    // increase speed by 5% for each grapes purchase
+    if (grapesPurchasedCount > 0) {
+        speed *= Math.pow(1.05, grapesPurchasedCount); // increase speed by 5% each time grapes are bought
+    }
 
     if (this.activeDuckType === 'sharpducky') {
         speed *= 1.5;
@@ -290,8 +379,8 @@ function hitDuck(rubberDuck, duck) {
     if (totalDucksSpawned === 5000 && !this.hasOrangeSkin) {
         this.hasOrangeSkin = true;
         this.duckTexture = 'orangeDuck';
-        let unlockText = this.add.text(200, 300, "You are now 0.1% more orange!", {
-            fontSize: '24px', fill: '#ffa500' 
+        let unlockText = this.add.text(200, 300, "Press P after reloading the game", {
+            fontSize: '8px', fill: '#ffa500' 
         });
 
         this.tweens.add({
@@ -348,6 +437,17 @@ function hitHordeDuck(rubberDuck, hordeDuck) {
 
 function update() {
     // You're dominating this game. Keep going.
+    const speed = 300; // Adjust as needed
+
+    if (this.cursors.left.isDown || this.keys.A.isDown) {
+        this.tracker.x -= speed * this.game.loop.delta / 1000;
+    } else if (this.cursors.right.isDown || this.keys.D.isDown) {
+        this.tracker.x += speed * this.game.loop.delta / 1000;
+    }
+
+    // Update the player's position based on the tracker's position
+    this.player.x = this.tracker.x;
+    this.player.y = this.tracker.y;
 }
 
 function spawnFeathers(x, y) {
