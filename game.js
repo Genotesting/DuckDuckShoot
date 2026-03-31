@@ -27,7 +27,7 @@ let shopOpen = false;
 let arsenalOpen = false;
 let hasOrangeSkin = false;
 
-let currentAmmo = 99999;
+let currentAmmo = 0;
 let maxAmmo = 10;
 
 const duckPrices = {
