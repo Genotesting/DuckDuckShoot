@@ -1,4 +1,3 @@
-// INSPIRED BY BRYANT ODEN - DUCK SONG
 const config = {
     type: Phaser.AUTO,
     width: 1520,
@@ -13,49 +12,56 @@ const config = {
         arcade: { gravity: { y: 0 }, debug: false }
     }
 };
+console.log("I am fully aware there is a duck stuck on the screen, deal with it. No but like, literally deal with it.")
 
 const game = new Phaser.Game(config);
 
-let throwCooldown = false;
+let throwCooldown = 100;
+let lastThrowTime = 0;
 let duckabilityCounter = 0;
 let totalDucksSpawned = 0;
-let grapesPurchasedCount = 0; 
+let grapesPurchasedCount = 0;
+let watermelonsPurchasedCount = 0;
+let blueberriesPurchasedCount = 0;
 let shopOpen = false;
 let arsenalOpen = false;
+let hasOrangeSkin = false;
+
+let currentAmmo = 99999;
+let maxAmmo = 10;
+
 const duckPrices = {
     'sharpducky': 1000,
     'quacksilver': 3000,
-    'grapes' : 750
+    'dvduck': 2000
 };
+
 let ownedDucks = ['rubberDuck'];
-
-let grapesPurchased = false; // Track if grapes are purchased
-
-function applyGrapesEffect() {
-    if (!grapesPurchased) {
-        grapesPurchased = true;
-        console.log("Grapes effect applied: +5% throwing speed");
-    }
-}
+let arsenalDucks = [];
 
 function getGrapesPrice() {
-    let basePrice = 750;
-    return Math.round(basePrice * Math.pow(1.5, grapesPurchasedCount));
+    return Math.round(50 * Math.pow(1.25, grapesPurchasedCount));
 }
 
+function getWatermelonPrice() {
+    return Math.round(50 * Math.pow(1.25, watermelonsPurchasedCount));
+}
+
+function getBlueberryPrice() {
+    const priceSequence = [30, 60, 120, 240, 480];
+    if (blueberriesPurchasedCount < priceSequence.length) {
+        return priceSequence[blueberriesPurchasedCount];
+    }
+    return 999999;
+}
 
 function preload() {
-    // Get ready for some serious assets loading
     this.load.image('duck', 'Sandwich/duck.png');
     this.load.image('rubberDuck', 'Sandwich/rubber_duck.png');
     this.load.image('sharpduckySprite', 'Sandwich/sharpducky.png');
     this.load.image('quacksilverSprite', 'Sandwich/quacksilver.png');
-    this.load.audio('squeak', 'Sandwich/squeak.mp3');
-    this.load.audio('quack', 'Sandwich/quack.mp3');
-    this.load.audio('backgroundTrack1', 'Sandwich/Background.mp3');
     this.load.image('orangeDuck', 'Sandwich/orangeduck.png');
-
-    // The real game starts here, those feathers aren't going to spawn themselves
+    this.load.image('dvduckSprite', 'Sandwich/dvduck.png');
     this.load.image('feathernorth', 'Sandwich/feathernorth.png');
     this.load.image('feathernortheast', 'Sandwich/feathernortheast.png');
     this.load.image('feathereast', 'Sandwich/feathereast.png');
@@ -64,433 +70,393 @@ function preload() {
     this.load.image('feathersouthwest', 'Sandwich/feathersouthwest.png');    
     this.load.image('featherwest', 'Sandwich/featherwest.png');
     this.load.image('feathernorthwest', 'Sandwich/feathernorthwest.png');
-
     this.load.image('grapesSprite', 'Sandwich/grape.png');
-
+    this.load.image('watermelonSprite', 'Sandwich/watermelon.png');
+    this.load.image('blueberrySprite', 'Sandwich/blueberry.png');
+    this.load.audio('squeak', 'Sandwich/squeak.mp3');
+    this.load.audio('quack', 'Sandwich/quack.mp3');
+    this.load.audio('backgroundTrack1', 'Sandwich/Background.mp3');
 }
 
-function playEndingMessage() {
-    let unlockText = this.add.text(150, 250, "Congrats! This is the end of the content for now. You can continue; the game doesn't end, but this is where the content stops.", {
-        fontSize: '16px', fill: '#ffa500' 
-    });
-
-    this.tweens.add({
-        targets: unlockText,
-        alpha: { from: 1, to: 0 },
-        duration: 5000,
-        onComplete: () => {
-            unlockText.destroy();
-        }
-    });
-}
-
-function playNextTrack() {
-    this.backgroundTrack.play({
-        loop: true
-    });
+function getTextureForDuck(type) {
+    if (type === 'rubberDuck') {
+        return hasOrangeSkin ? 'orangeDuck' : 'rubberDuck';
+    }
+    if (type === 'sharpducky') return 'sharpduckySprite';
+    if (type === 'quacksilver') return 'quacksilverSprite';
+    if (type === 'dvduck') return 'dvduckSprite';
+    return 'rubberDuck';
 }
 
 function create() {
-    // This duck is here to kick some serious tail, treat it with respect
     this.duck = this.physics.add.sprite(760, 356, 'duck');
     this.duck.setCollideWorldBounds(true);
 
     this.player = { x: 760, y: 600 };
-
     this.rubberDucks = this.physics.add.group();
+    this.enemyDucks = this.physics.add.group();
+    this.featherProjectiles = this.physics.add.group();
 
-    // Getting the sounds ready to blow your mind
     this.squeakSound = this.sound.add('squeak');
     this.quackSound = this.sound.add('quack');
 
-    // Display your current status, because you’re about to change the game
-    this.scoreText = this.add.text(16, 16, 'Duckability Counter: 0', {
-        fontSize: '32px',
-        fill: '#ff0000'
-    });
+    this.scoreText = this.add.text(16, 16, 'Duckability Counter: 0', { fontSize: '32px', fill: '#ff0000' });
+    this.ammoText = this.add.text(16, 60, `Ammo: ${currentAmmo}/${maxAmmo}`, { fontSize: '32px', fill: '#00ff00' });
 
     this.tracker = this.add.image(760, 600, 'rubberDuck');
     this.tracker.setOrigin(0.5, 0.5);
     this.physics.world.enable(this.tracker);
-    this.tracker.body.setCollideWorldBounds(true); // Set borders for the tracker
+    this.tracker.body.setCollideWorldBounds(true);
 
-    // Let’s give this background some serious color, yeah?
     this.cameras.main.setBackgroundColor(0x87CEEB);
 
-    // I Listen for player clicks
     this.input.on('pointerdown', (pointer) => {
-        if (!throwCooldown && !shopOpen && !arsenalOpen) {
-            throwCooldown = true;
+        const currentTime = this.time.now;
+        if (currentTime - lastThrowTime >= throwCooldown && !shopOpen && !arsenalOpen && currentAmmo > 0) {
+            lastThrowTime = currentTime;
+            currentAmmo--;
+            this.ammoText.setText(`Ammo: ${currentAmmo}/${maxAmmo}`);
             shootRubberDuck.call(this, pointer.x, pointer.y);
-            this.time.delayedCall(150, () => throwCooldown = false);
         }
     });
 
-    // Collisions? Duck, please. We're bringing the hurt
-    this.physics.add.collider(this.rubberDucks, this.duck, hitDuck, null, this);
+    this.physics.add.collider(this.rubberDucks, this.enemyDucks, hitDuck, null, this);
+    this.physics.add.collider(this.featherProjectiles, this.enemyDucks, hitFeather, null, this);
 
     this.activeDuckType = 'rubberDuck';
 
     createShop.call(this);
 
-    this.input.keyboard.on('keydown-G', () => {
-        toggleShop.call(this);
-    });
+    this.input.keyboard.on('keydown-G', () => toggleShop.call(this));
+    this.input.keyboard.on('keydown-F', () => toggleArsenal.call(this));
+    this.input.keyboard.on('keydown-P', () => playEndingMessage.call(this));
 
-    this.input.keyboard.on('keydown-F', () => {
-        toggleArsenal.call(this);
-    });
-
-    this.input.keyboard.on('keydown-P', () => {
-        playEndingMessage.call(this);
-    });
+    this.input.keyboard.on('keydown-ONE', () => selectDuckByKey.call(this, 'rubberDuck'));
+    this.input.keyboard.on('keydown-TWO', () => selectDuckByKey.call(this, 'sharpducky'));
+    this.input.keyboard.on('keydown-THREE', () => selectDuckByKey.call(this, 'quacksilver'));
+    this.input.keyboard.on('keydown-FOUR', () => selectDuckByKey.call(this, 'dvduck'));
 
     this.backgroundTrack = this.sound.add('backgroundTrack1');
+    this.backgroundTrack.play({ loop: true });
 
-    playNextTrack.call(this);
+    this.cursors = this.input.keyboard.createCursorKeys();
+    this.keys = this.input.keyboard.addKeys('W,A,S,D');
 
-    // Initialize cursor keys and custom keys
-    this.cursors = this.input.keyboard.createCursorKeys(); // Arrow keys
-    this.keys = this.input.keyboard.addKeys({
-        A: Phaser.Input.Keyboard.KeyCodes.A,
-        D: Phaser.Input.Keyboard.KeyCodes.D
+    this.time.addEvent({
+        delay: 1000,
+        callback: () => {
+            if (currentAmmo < maxAmmo) {
+                currentAmmo++;
+                this.ammoText.setText(`Ammo: ${currentAmmo}/${maxAmmo}`);
+            }
+        },
+        loop: true
     });
+
+    for (let i = 0; i < 4; i++) {
+        spawnDuck.call(this);
+    }
 }
 
 function createShop() {
-    // This shop's got everything you need and then it doesn't
-    this.shopBg = this.add.rectangle(1200, 356, 450, 712, 0x000000, 0.5).setDepth(10);
-    this.shopBg.setOrigin(0.5, 0.5);
+    this.shopBg = this.add.rectangle(1200, 356, 450, 712, 0x000000, 0.5).setDepth(10).setOrigin(0.5);
+    this.shopTitle = this.add.text(1050, 30, 'Shop (sorted by price)', { fontSize: '32px', fill: '#ffffff' }).setDepth(11);
 
-    this.shopTitle = this.add.text(1050, 50, 'Shop', { fontSize: '48px', fill: '#ffffff' }).setDepth(11);
-
-    this.sharpduckyButton = this.add.text(1050, 150, 'Sharpducky - 1000', { fontSize: '32px', fill: '#ffffff' }).setDepth(11);
-    this.sharpduckyButton.setInteractive();
-    this.sharpduckyButton.on('pointerdown', () => {
-        confirmPurchase.call(this, 'sharpducky');
-    });
-
-    this.quacksilverButton = this.add.text(1050, 250, 'Quacksilver - 3000', { fontSize: '32px', fill: '#ffffff' }).setDepth(11);
-    this.quacksilverButton.setInteractive();
-    this.quacksilverButton.on('pointerdown', () => {
-        confirmPurchase.call(this, 'quacksilver');
-    });
-
-    this.grapesButton = this.add.text(1050, 350, `Up-grapes - 750`, { fontSize: '32px', fill: '#ffffff' }).setDepth(11);
-    this.grapesButton.setInteractive();
-    this.grapesButton.on('pointerdown', () => {
-        confirmPurchase.call(this, 'grapes');
-    });
-
-    this.grapesPreview = this.add.image(1020, 365, 'grapesSprite').setDepth(11).setScale(0.5);
+    this.sharpduckyButton = this.add.text(1050, 150, '', { fontSize: '32px', fill: '#ffffff' }).setDepth(11).setInteractive();
+    this.quacksilverButton = this.add.text(1050, 150, '', { fontSize: '32px', fill: '#ffffff' }).setDepth(11).setInteractive();
+    this.dvduckButton = this.add.text(1050, 150, '', { fontSize: '32px', fill: '#ffffff' }).setDepth(11).setInteractive();
+    this.grapesButton = this.add.text(1050, 150, '', { fontSize: '32px', fill: '#ffffff' }).setDepth(11).setInteractive();
+    this.watermelonButton = this.add.text(1050, 150, '', { fontSize: '32px', fill: '#ffffff' }).setDepth(11).setInteractive();
+    this.blueberryButton = this.add.text(1050, 150, '', { fontSize: '32px', fill: '#ffffff' }).setDepth(11).setInteractive();
 
     this.sharpduckyPreview = this.add.image(1020, 165, 'sharpduckySprite').setDepth(11).setScale(0.5);
-    this.quacksilverPreview = this.add.image(1020, 265, 'quacksilverSprite').setDepth(11).setScale(0.5);
+    this.quacksilverPreview = this.add.image(1020, 165, 'quacksilverSprite').setDepth(11).setScale(0.5);
+    this.dvduckPreview = this.add.image(1020, 165, 'dvduckSprite').setDepth(11).setScale(0.5);
+    this.grapesPreview = this.add.image(1020, 165, 'grapesSprite').setDepth(11).setScale(0.5);
+    this.watermelonPreview = this.add.image(1020, 165, 'watermelonSprite').setDepth(11).setScale(0.5);
+    this.blueberryPreview = this.add.image(1020, 165, 'blueberrySprite').setDepth(11).setScale(0.5);
 
-    this.shopBg.setVisible(false);
-    this.shopTitle.setVisible(false);
-    this.sharpduckyButton.setVisible(false);
-    this.quacksilverButton.setVisible(false);
-    this.grapesButton.setVisible(false);
-    this.sharpduckyPreview.setVisible(false);
-    this.quacksilverPreview.setVisible(false);
-    this.grapesPreview.setVisible(false);
+    this.shopItemList = [
+        {type: 'grapes', button: this.grapesButton, preview: this.grapesPreview, priceFunc: getGrapesPrice},
+        {type: 'watermelon', button: this.watermelonButton, preview: this.watermelonPreview, priceFunc: getWatermelonPrice},
+        {type: 'blueberry', button: this.blueberryButton, preview: this.blueberryPreview, priceFunc: getBlueberryPrice},
+        {type: 'dvduck', button: this.dvduckButton, preview: this.dvduckPreview, priceFunc: () => duckPrices.dvduck},
+        {type: 'sharpducky', button: this.sharpduckyButton, preview: this.sharpduckyPreview, priceFunc: () => duckPrices.sharpducky},
+        {type: 'quacksilver', button: this.quacksilverButton, preview: this.quacksilverPreview, priceFunc: () => duckPrices.quacksilver}
+    ];
+
+    const hideList = [this.shopBg, this.shopTitle];
+    this.shopItemList.forEach(item => {
+        hideList.push(item.button);
+        hideList.push(item.preview);
+    });
+    hideList.forEach(obj => obj.setVisible(false));
+
+    this.shopItemList.forEach(item => {
+        item.button.on('pointerdown', () => confirmPurchase.call(this, item.type));
+    });
 }
 
 function toggleShop() {
     shopOpen = !shopOpen;
+    const visible = shopOpen;
 
-    this.shopBg.setVisible(shopOpen);
-    this.shopTitle.setVisible(shopOpen);
-    this.sharpduckyButton.setVisible(shopOpen);
-    this.quacksilverButton.setVisible(shopOpen);
-    this.grapesButton.setVisible(shopOpen);
-    this.sharpduckyPreview.setVisible(shopOpen);
-    this.quacksilverPreview.setVisible(shopOpen);
-    this.grapesPreview.setVisible(shopOpen);
-
-    this.sharpduckyButton.setInteractive(shopOpen);
-    this.quacksilverButton.setInteractive(shopOpen);
-    this.grapesButton.setInteractive(shopOpen);
+    [this.shopBg, this.shopTitle].forEach(obj => obj.setVisible(visible));
+    this.shopItemList.forEach(item => {
+        item.button.setVisible(visible);
+        item.preview.setVisible(visible);
+    });
 
     if (shopOpen) {
-        this.grapesButton.setText(`Up-grapes - ${getGrapesPrice()}`);
+        const sorted = [...this.shopItemList].sort((a, b) => a.priceFunc() - b.priceFunc());
+        let y = 150;
+        sorted.forEach(item => {
+            item.button.setText(`${item.type.charAt(0).toUpperCase() + item.type.slice(1)} - ${item.priceFunc()}`);
+            item.button.y = y;
+            item.preview.y = y + 15;
+            y += 100;
+        });
     }
 }
 
 function confirmPurchase(type) {
-    let price = (type === 'grapes') ? getGrapesPrice() : duckPrices[type]; // Get current grapes price
+    let price;
+    if (type === 'grapes') price = getGrapesPrice();
+    else if (type === 'watermelon') price = getWatermelonPrice();
+    else if (type === 'blueberry') price = getBlueberryPrice();
+    else price = duckPrices[type];
 
-    console.log(`Attempting to purchase ${type} for ${price}. Current duckabilityCounter: ${duckabilityCounter}`);
+    if (duckabilityCounter < price) return;
+    if (type === 'grapes' && grapesPurchasedCount >= 5) return;
+    if (type === 'blueberry' && blueberriesPurchasedCount >= 5) return;
 
-    if (duckabilityCounter >= price && (type !== 'grapes' || grapesPurchasedCount < 5)) {
-        let confirmBg = this.add.rectangle(400, 300, 500, 100, 0x000000, 0.5).setDepth(11);
-        confirmBg.setOrigin(0.5, 0.5);
+    const confirmBg = this.add.rectangle(760, 356, 500, 150, 0x000000, 0.85).setDepth(20);
+    const confirmText = this.add.text(760, 320, `Buy ${type} for ${price}? (Y/N)`, { fontSize: '28px', fill: '#ffffff' }).setDepth(21).setOrigin(0.5);
 
-        let confirmText = this.add.text(400, 300, `Buy ${type} for ${price}? (Y/N)`, {
-            fontSize: '24px', fill: '#ffffff'
-        }).setDepth(12).setOrigin(0.5, 0.5);
-
-        console.log(`You're about to buy ${type}, make up your mind!`);
-
-        this.input.keyboard.removeAllListeners('keydown-Y');
-        this.input.keyboard.removeAllListeners('keydown-N');
-
-        if (duckabilityCounter >= price && (type !== 'grapes' || grapesPurchasedCount < 5)) {
-            // Handle purchase confirmation
-            this.input.keyboard.once('keydown-Y', () => {
-                console.log(`You've bought ${type}, prepare for some epicness!`);
-                if (type === 'grapes') {
-                    applyGrapesEffect.call(this); // Apply the grapes effect
-                    grapesPurchasedCount++; // Increase grapes purchased count
-                    this.grapesButton.setText(`Up-grapes - ${getGrapesPrice()}`); // Update the grapes button text
-                } else {
-                    duckabilityCounter -= price; // Deduct the price only if it's not grapes
-                }
-                selectDuck.call(this, type);
-                console.log(`Purchased ${type} for ${price}. New duckabilityCounter: ${duckabilityCounter}`);
-                this.scoreText.setText('Duckability Counter: ' + duckabilityCounter);
-                updateShop.call(this);
-                confirmText.destroy();
-                confirmBg.destroy();
-            });
-        }        
-
-        this.input.keyboard.once('keydown-N', () => {
-            console.log(`You backed out of buying ${type}? Better luck next time!`);
-            confirmText.destroy();
-            confirmBg.destroy();
-        });
-    } else {
-        console.log(`Not enough duckability to purchase ${type}. Required: ${price}, Available: ${duckabilityCounter}`);
-    }
-}
-
-function selectDuck(type) {
-    if (duckabilityCounter >= duckPrices[type]) {
-        duckabilityCounter -= duckPrices[type];
+    this.input.keyboard.once('keydown-Y', () => {
+        duckabilityCounter -= price;
         this.scoreText.setText('Duckability Counter: ' + duckabilityCounter);
-        this.activeDuckType = type;
-        ownedDucks.push(type);
-        this.tracker.setTexture(type === 'sharpducky' ? 'sharpduckySprite' : type === 'quacksilver' ? 'quacksilverSprite' : 'rubberDuck');
-    }
-}
 
-function updateShop() {
-    if (ownedDucks.includes('sharpducky')) {
-        this.sharpduckyButton.setVisible(false);
-        this.sharpduckyPreview.setVisible(false);
-    }
-    if (ownedDucks.includes('quacksilver')) {
-        this.quacksilverButton.setVisible(false);
-        this.quacksilverPreview.setVisible(false);
-    }
+        if (type === 'grapes') grapesPurchasedCount++;
+        else if (type === 'watermelon') {
+            watermelonsPurchasedCount++;
+            throwCooldown = Math.max(40, throwCooldown * 0.85);
+        }
+        else if (type === 'blueberry') {
+            blueberriesPurchasedCount++;
+            maxAmmo += 10;
+            this.ammoText.setText(`Ammo: ${currentAmmo}/${maxAmmo}`);
+        }
+        else {
+            if (!ownedDucks.includes(type)) ownedDucks.push(type);
+            this.activeDuckType = type;
+            this.tracker.setTexture(getTextureForDuck(type));
+        }
+
+        confirmBg.destroy();
+        confirmText.destroy();
+        toggleShop.call(this);
+    });
+
+    this.input.keyboard.once('keydown-N', () => {
+        confirmBg.destroy();
+        confirmText.destroy();
+    });
 }
 
 function toggleArsenal() {
     arsenalOpen = !arsenalOpen;
-
     if (arsenalOpen) {
-        this.arsenalBg = this.add.rectangle(400, 300, 800, 600, 0x000000, 0.5).setDepth(10);
-        this.arsenalTitle = this.add.text(300, 50, 'Arsenal', { fontSize: '32px', fill: '#ffffff' }).setDepth(11);
+        this.arsenalBg = this.add.rectangle(400, 356, 600, 500, 0x000000, 0.7).setDepth(15);
+        this.arsenalTitle = this.add.text(250, 120, 'Arsenal (1-4 to equip)', { fontSize: '28px', fill: '#ffffff' }).setDepth(16);
 
-        let yPosition = 100;
-        this.arsenalDucks = [];
-        ownedDucks.forEach((duck) => {
-            let duckSprite = this.add.image(400, yPosition, duck === 'sharpducky' ? 'sharpduckySprite' : duck === 'quacksilver' ? 'quacksilverSprite' : 'rubberDuck').setDepth(11).setScale(0.5);
-            duckSprite.setInteractive();
-            duckSprite.on('pointerdown', () => {
-                this.activeDuckType = duck;
-                this.tracker.setTexture(duck === 'sharpducky' ? 'sharpduckySprite' : duck === 'quacksilver' ? 'quacksilverSprite' : 'rubberDuck');
-                toggleArsenal.call(this);
-            });
-            this.arsenalDucks.push(duckSprite);
-            yPosition += 100;
+        arsenalDucks = [];
+        let y = 200;
+        ownedDucks.forEach(duckType => {
+            const tex = getTextureForDuck(duckType);
+            const btn = this.add.image(400, y, tex).setScale(0.6).setDepth(16);
+            arsenalDucks.push(btn);
+            y += 90;
         });
     } else {
-        this.arsenalBg.destroy();
-        this.arsenalTitle.destroy();
-        this.arsenalDucks.forEach((duckSprite) => duckSprite.destroy());
+        if (this.arsenalBg) this.arsenalBg.destroy();
+        if (this.arsenalTitle) this.arsenalTitle.destroy();
+        arsenalDucks.forEach(sprite => sprite.destroy());
+        arsenalDucks = [];
+    }
+}
+
+function selectDuckByKey(type) {
+    if (ownedDucks.includes(type) || type === 'rubberDuck') {
+        this.activeDuckType = type;
+        this.tracker.setTexture(getTextureForDuck(type));
     }
 }
 
 function shootRubberDuck(targetX, targetY) {
     let speed = 500;
+    if (grapesPurchasedCount > 0) speed *= Math.pow(1.10, grapesPurchasedCount);
+    if (this.activeDuckType === 'sharpducky') speed *= 1.6;
+    if (this.activeDuckType === 'quacksilver') speed *= 0.7;
 
-    // increase speed by 5% for each grapes purchase
-    if (grapesPurchasedCount > 0) {
-        speed *= Math.pow(1.05, grapesPurchasedCount); // increase speed by 5% each time grapes are bought
-    }
-
-    if (this.activeDuckType === 'sharpducky') {
-        speed *= 1.5;
-    } else if (this.activeDuckType === 'quacksilver') {
-        speed *= 0.75;
-    }
-
-    let rubberDuck = this.rubberDucks.create(this.player.x, this.player.y, 
-        this.activeDuckType === 'sharpducky' ? 'sharpduckySprite' : 
-        this.activeDuckType === 'quacksilver' ? 'quacksilverSprite' : 'rubberDuck'
-    );
-
+    const texture = getTextureForDuck(this.activeDuckType);
+    const rubberDuck = this.rubberDucks.create(this.tracker.x, this.tracker.y, texture);
     this.squeakSound.play();
 
     this.tracker.setVisible(false);
+    this.time.delayedCall(400, () => this.tracker.setVisible(true));
 
     const angle = Phaser.Math.Angle.Between(rubberDuck.x, rubberDuck.y, targetX, targetY);
-    
     rubberDuck.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
+    rubberDuck.setData('pierceCount', 0);
 
-    this.time.delayedCall(2000, () => rubberDuck.destroy());
+    if (this.activeDuckType === 'dvduck') {
+        rubberDuck.setAngularVelocity(800);
+    }
 
-    this.time.delayedCall(500, () => this.tracker.setVisible(true));
+    if (this.activeDuckType === 'dvduck') {
+        rubberDuck.setBounce(1, 1);
+        rubberDuck.setCollideWorldBounds(true);
+    }
+
+    if (this.activeDuckType !== 'dvduck') {
+        this.time.delayedCall(3000, () => { if (rubberDuck) rubberDuck.destroy(); });
+    }
 }
 
-function hitDuck(rubberDuck, duck) {
+function hitDuck(rubberDuck, targetDuck) {
     this.quackSound.play();
-
     duckabilityCounter += 1;
     this.scoreText.setText('Duckability Counter: ' + duckabilityCounter);
 
-    if (this.activeDuckType === 'sharpducky') {
-        rubberDuck.setData('pierceCount', (rubberDuck.getData('pierceCount') || 0) + 1);
-        if (rubberDuck.getData('pierceCount') < 2) {
-            duck.destroy();
-            spawnFeathers.call(this, duck.x, duck.y);
+    const type = this.activeDuckType;
+
+    if (type === 'sharpducky') {
+        let pierce = (rubberDuck.getData('pierceCount') || 0) + 1;
+        rubberDuck.setData('pierceCount', pierce);
+        if (pierce < 2) {
+            targetDuck.destroy();
+            spawnFeathers.call(this, targetDuck.x, targetDuck.y);
+            rubberDuck.setVelocity(rubberDuck.body.velocity.x * 0.6, rubberDuck.body.velocity.y * 0.6);
             return;
         }
-    } else if (this.activeDuckType === 'quacksilver') {
-        let ducksInRange = this.physics.overlapCirc(duck.x, duck.y, 100, true, true);
-        let destroyedCount = 0;
-        ducksInRange.forEach((d) => {
-            if (d !== duck && destroyedCount < 5) {
-                d.destroy();
-                destroyedCount++;
-            }
-        });
+    } else if (type === 'quacksilver') {
+        spawnQuackFeathers.call(this, targetDuck.x, targetDuck.y);
     }
 
     rubberDuck.destroy();
-    duck.destroy();
-    spawnFeathers.call(this, duck.x, duck.y);
+    targetDuck.destroy();
+    spawnFeathers.call(this, targetDuck.x, targetDuck.y);
     totalDucksSpawned++;
 
-    // Look at you now, you're getting orange!
-    if (totalDucksSpawned === 5000 && !this.hasOrangeSkin) {
-        this.hasOrangeSkin = true;
-        this.duckTexture = 'orangeDuck';
-        let unlockText = this.add.text(200, 300, "Press P after reloading the game", {
-            fontSize: '8px', fill: '#ffa500' 
-        });
-
-        this.tweens.add({
-            targets: unlockText,
-            alpha: { from: 1, to: 0 },
-            duration: 5000,
-            onComplete: () => {
-                unlockText.destroy();
-            }
-        });
+    if (totalDucksSpawned >= 5000 && !hasOrangeSkin) {
+        hasOrangeSkin = true;
+        if (this.activeDuckType === 'rubberDuck') this.tracker.setTexture('orangeDuck');
     }
 
-    // Time for a horde of ducks? No problem.
-    if (totalDucksSpawned <= 5000 && totalDucksSpawned % 5 === 0 && Math.random() < 0.3) {
-        spawnHorde.call(this, duck);
+    if (totalDucksSpawned % 5 === 0 && Math.random() < 0.15) {
+        spawnHorde.call(this);
     } else {
-        this.time.delayedCall(1000, () => spawnDuck.call(this));
+        this.time.delayedCall(1500, () => spawnDuck.call(this));
     }
+}
+
+function spawnQuackFeathers(x, y) {
+    const featherDirs = ['feathernorth','feathernortheast','feathereast','feathersoutheast','feathersouth','feathersouthwest','featherwest','feathernorthwest'];
+    for (let i = 0; i < 3; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const tex = featherDirs[Math.floor(Math.random() * featherDirs.length)];
+        const feather = this.featherProjectiles.create(x, y, tex);
+        feather.setVelocity(Math.cos(angle) * 420, Math.sin(angle) * 420);
+        feather.setAngularVelocity(Phaser.Math.Between(-300, 300));
+        this.time.delayedCall(1400, () => { if (feather) feather.destroy(); });
+    }
+}
+
+function hitFeather(feather, enemyDuck) {
+    feather.destroy();
+    enemyDuck.destroy();
+    spawnFeathers.call(this, enemyDuck.x, enemyDuck.y);
 }
 
 function spawnDuck() {
-    let randomX = Phaser.Math.Between(50, 1470);
-    let randomY = Phaser.Math.Between(85, 500);
-
-    let newDuck = this.physics.add.sprite(randomX, randomY, 
-        this.hasOrangeSkin ? 'orangeDuck' : 'duck'
-    );
+    const x = Phaser.Math.Between(80, 1440);
+    const y = Phaser.Math.Between(80, 520);
+    const newDuck = this.physics.add.sprite(x, y, 'duck');
     newDuck.setCollideWorldBounds(true);
-
-    this.physics.add.collider(this.rubberDucks, newDuck, hitDuck, null, this);
-
+    this.enemyDucks.add(newDuck);
+    newDuck.lastMoveTime = this.time.now;
     return newDuck;
 }
 
-function spawnHorde(triggerDuck) {
-    // A horde? Why not... let’s wreck the place
-    for (let i = 0; i < 2; i++) {
-        let hordeDuck = spawnDuck.call(this);
-        hordeDuck.setData('isHordeDuck', true);
-    }
-
-    triggerDuck.setData('isHordeDuck', false);
+function spawnHorde() {
+    for (let i = 0; i < 4; i++) spawnDuck.call(this);
 }
 
-function hitHordeDuck(rubberDuck, hordeDuck) {
-    // Horde ducks aren’t going to know what hit them
-    if (hordeDuck.getData('isHordeDuck')) {
-        hordeDuck.destroy();
-        rubberDuck.destroy();
-    } else {
-        hitDuck.call(this, rubberDuck, hordeDuck);
+function spawnFeathers(x, y) {
+    const directions = ['feathernorth','feathernortheast','feathereast','feathersoutheast','feathersouth','feathersouthwest','featherwest','feathernorthwest'];
+    for (let i = 0; i < 6; i++) {
+        const angle = (i / 6) * Math.PI * 2;
+        const dir = directions[i % directions.length];
+        const feather = this.physics.add.sprite(x, y, dir);
+        feather.setVelocity(Math.cos(angle) * 70, Math.sin(angle) * 70);
+        feather.setAngularVelocity(Phaser.Math.Between(-200, 200));
+        this.tweens.add({
+            targets: feather,
+            alpha: 0,
+            duration: 700,
+            delay: 400,
+            onComplete: () => feather.destroy()
+        });
     }
 }
 
 function update() {
-    // You're dominating this game. Keep going.
-    const speed = 300; // Adjust as needed
+    const speed = 380;
+    const delta = this.game.loop.delta / 1000;
 
-    if (this.cursors.left.isDown || this.keys.A.isDown) {
-        this.tracker.x -= speed * this.game.loop.delta / 1000;
-    } else if (this.cursors.right.isDown || this.keys.D.isDown) {
-        this.tracker.x += speed * this.game.loop.delta / 1000;
-    }
+    if (this.cursors.left.isDown || this.keys.A.isDown) this.tracker.x -= speed * delta;
+    if (this.cursors.right.isDown || this.keys.D.isDown) this.tracker.x += speed * delta;
+    if (this.cursors.up.isDown || this.keys.W.isDown) this.tracker.y -= speed * delta;
+    if (this.cursors.down.isDown || this.keys.S.isDown) this.tracker.y += speed * delta;
 
-    // Update the player's position based on the tracker's position
     this.player.x = this.tracker.x;
     this.player.y = this.tracker.y;
+
+    const now = this.time.now;
+    this.enemyDucks.getChildren().forEach(duck => {
+        if (now - (duck.lastMoveTime || 0) > 5000) {
+            if (Math.random() < 1/20) {
+                const angles = [0, Math.PI/4, Math.PI/2, 3*Math.PI/4, Math.PI, 5*Math.PI/4, 3*Math.PI/2, 7*Math.PI/4];
+                const randAngle = angles[Math.floor(Math.random() * 8)];
+                const tx = Phaser.Math.Clamp(duck.x + Math.cos(randAngle) * 50, 80, 1440);
+                const ty = Phaser.Math.Clamp(duck.y + Math.sin(randAngle) * 50, 80, 520);
+
+                this.tweens.add({
+                    targets: duck,
+                    x: tx,
+                    y: ty,
+                    duration: 800,
+                    ease: 'Sine.easeInOut'
+                });
+            }
+            duck.lastMoveTime = now;
+        }
+
+        if (duck.x < -50 || duck.x > 1570 || duck.y < -50 || duck.y > 762) duck.destroy();
+    });
+
+    this.rubberDucks.getChildren().forEach(p => {
+        if (p.x < -50 || p.x > 1570 || p.y < -50 || p.y > 762) p.destroy();
+    });
 }
 
-function spawnFeathers(x, y) {
-    const numFeathers = 5;
-    const featherDirections = [
-        'feathernorth', 'feathernortheast', 'feathereast', 'feathersoutheast',
-        'feathersouth', 'feathersouthwest', 'featherwest', 'feathernorthwest'
-    ];
-
-    const selectedDirections = [];
-    while (selectedDirections.length < numFeathers) {
-        const randomIndex = Math.floor(Math.random() * featherDirections.length);
-        const direction = featherDirections[randomIndex];
-        if (!selectedDirections.includes(direction)) {
-            selectedDirections.push(direction);
-        }
-    }
-
-    const angleStep = Math.PI * 2 / numFeathers;
-
-    for (let i = 0; i < numFeathers; i++) {
-        const angle = i * angleStep;
-        const featherX = x + Math.cos(angle) * 10;
-        const featherY = y + Math.sin(angle) * 10;
-
-        const featherDirection = selectedDirections[i];
-        let feather = this.physics.add.sprite(featherX, featherY, featherDirection);
-        feather.setAlpha(1);
-
-        feather.setVelocity(Math.cos(angle) * 50, Math.sin(angle) * 50);
-
-        if (i < numFeathers / 2) {
-            feather.setAngularVelocity(100);
-        } else {
-            feather.setAngularVelocity(-100);
-        }
-
-        this.tweens.add({
-            targets: feather,
-            alpha: 0,
-            duration: 500,
-            delay: 300,
-            onComplete: () => feather.destroy(),
-        });
-    }
+function playEndingMessage() {
+    const text = this.add.text(200, 200, "Congrats! This is the end of the current content.\nYou can keep playing forever though!", { fontSize: '20px', fill: '#ffa500', align: 'center' });
+    this.tweens.add({
+        targets: text,
+        alpha: 0,
+        duration: 6000,
+        onComplete: () => text.destroy()
+    });
 }
