@@ -6,7 +6,7 @@ DuckDuckShoot is a fun, chaotic web game where you shoot rubber ducks at other d
 
 Developer
 
-Created by Geno from Geno (INC).
+Created by Geno from Geno.
 
 Gameplay Features
 
@@ -20,7 +20,7 @@ Epic Duck Battles: Hit ducks, spawn feathers, and maybe even cause a duck horde!
 
 Requirements
 
-Platform: Web-based (runs in a browser, no OS restrictions as far as we know).
+Platform: Web-based (runs in a browser, no OS restrictions as far as I know).
 
 RAM:
 
